@@ -183,9 +183,13 @@ void handler()
             }
             else if (!strcmp(argv1[argc1 - 2], ">>"))
             {
-                concat = 1;
                 argv1[argc1 - 2] = NULL;
                 outfile = argv1[argc1 - 1];
+                if (access(outfile, F_OK) == 0) {
+                    redirect=1;
+                } else {
+                    concat = 1;
+                }
             }
             else
             {
@@ -220,6 +224,7 @@ void handler()
             /*case where there is no file opened*/
             else if (concat)
             {
+        
                 fd = open(outfile, O_RDWR | O_CREAT | O_APPEND, 0660);
                 close(STDOUT_FILENO);
                 dup(fd);
