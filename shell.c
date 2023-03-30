@@ -9,20 +9,36 @@
 
 char *prompt = "hello";
 
-int main()
+
+char command[1024];
+char previous_command[1024];
+char *token;
+int i;
+char *outfile;
+int amper, redirect, concat /*open new file*/, outerr /*related to stderr*/;
+int fd, piping, retid, status, argc1 /*last token indx*/;
+int fildes[2];
+char *argv1[10], *argv2[10];
+
+void sig_handler()
 {
-    char command[1024];
-    char previous_command[1024];
-    char *token;
-    int i;
-    char *outfile;
-    int amper, redirect, concat /*open new file*/, outerr /*related to stderr*/;
-    int fd, piping, retid, status, argc1 /*last token indx*/;
-    int fildes[2];
-    char *argv1[10], *argv2[10];
+        signal(SIGINT, sig_handler);
+	    printf("\n You typed Control-C!\n");
+        printf("%s: ", prompt);
+        fflush(stdout);
+}
+
+
+    
+void handler()
+{
+    
+    signal(SIGINT, sig_handler);
 
     while (1)
     {
+        
+    
         if (argv1[0] != NULL)
         {
             strcpy(previous_command, "");
@@ -122,6 +138,8 @@ int main()
 
                     printf("%s ", argv1[indx]);
                 }
+                //////////////
+                // amper = 1; ??
             }
             printf("\n");
             continue;
@@ -133,9 +151,12 @@ int main()
             {
                 printf("cd: no such file or directory: %s\n", argv1[1]);
                 exit(1);
+                /////////////
+               //amper = 0;?
             }
+            //////////////
+            // amper = 1;?
         }
-
         /* Does command line end with & */
         if (!strcmp(argv1[argc1 - 1], "&"))
         {
@@ -235,3 +256,9 @@ int main()
             retid = wait(&status);
     }
 }
+
+int main()
+{
+    signal(SIGINT, sig_handler);
+    handler();
+} 
