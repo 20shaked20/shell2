@@ -13,16 +13,84 @@ char *names[10];
 char *vales[10];
 int num_variables = 0;
 char command[1024];
+char command_pipe[1024];
 char previous_command[1024];
 char *token;
 int i ,x;
 char *outfile;
+char *buffer[256];
+int ind = 0;
 int amper, redirect, concat /*open new file*/, outerr /*related to stderr*/;
 int fd, piping, pipings = 0, retid, status, argc1 /*last token indx*/;
 int fildes[3];
-char *argv1[10], *argv2[10], *argv3[10], *argv4[10] *commands[100];
+char *argv1[10], *argv2[10], *argv3[10], *argv4[10],  *commands[100];
 int num_comm=0;
-// char *argvs[3][10];
+
+
+//remove spaces and '\n' 
+void my_remove(char* conn){
+	if(conn[strlen(conn)-1]==' ' || conn[strlen(conn)-1]=='\n')
+	conn[strlen(conn)-1]='\0';
+	if(conn[0]==' ' || conn[0]=='\n'){
+         memmove(conn, conn+1, strlen(conn));
+    }
+}
+
+void dev(char** buffer,int *n,char *bf,const char *ch){
+	char *tk;
+	tk = strtok(bf,ch);
+	int place=-1;
+	while(tk){
+		buffer[++place]=malloc(sizeof(tk)+1);
+		strcpy(buffer[place],tk);
+		my_remove(buffer[place]);
+		tk = strtok(NULL,ch);
+	}
+	buffer[++place]=NULL;
+	*n=place;
+}
+
+void my_pipe(char** buf,int index){ 
+	if(index>50){
+         return;
+    }
+
+	int fd[50][2]; // 50 pipes
+    int indx;
+	char *array[50];
+
+	for(int i=0;i<index;i++){
+		dev(array,&indx,buf[i]," ");
+
+		if(i!=index-1){
+			if(pipe(fd[i])<0){
+				printf("ERROR!");
+				return;
+			}
+		}
+		if(fork()==0){
+			if(i!=index-1){
+				dup2(fd[i][1],STDOUT_FILENO);
+				close(fd[i][0]);
+				close(fd[i][1]);
+			}
+
+			if(i!=0){
+				dup2(fd[i-1][0],STDIN_FILENO);
+				close(fd[i-1][1]);
+				close(fd[i-1][0]);
+			}
+			execvp(array[0],array);
+		}
+        
+		if(i!=0){ 
+			close(fd[i-1][0]);
+			close(fd[i-1][1]);
+		}
+		wait(NULL);
+	}
+}
+
 
 void sig_handler()
 {
@@ -51,24 +119,24 @@ void handler()
                 strcat(previous_command, " ");
             }
         }
-        
+        //// save the commnd ////
         printf("%s: ", prompt);
         fgets(command, 1024, stdin);
         command[strlen(command) - 1] = '\0';
         commands[num_comm] = strdup(command);
         num_comm++;
         piping = 0;
-        char shit = command[0];
-        if (shit == '$'){
+        char ch = command[0];
+
+        //// if is object save ////
+        if (ch == '$'){
             i = 0;
             token = strtok(command, " ");
             while (token != NULL)
             {   
-                printf("token ->  %s  \n", token);
                 if(i == 0){
                 names[num_variables] = strdup(token);
                 token = strtok(NULL, " ");
-                printf("%s \n" ,  names[num_variables]);
                 }
                 if(i == 1){
                 argv4[1] = strdup(token);
@@ -76,7 +144,6 @@ void handler()
                 }
                 if(i == 2){
                 vales[num_variables] =  strdup(token); 
-                printf("%s \n" ,  vales[num_variables]);   
                 token = strtok(NULL, " ");  
                 }            
                 i++;
@@ -85,24 +152,22 @@ void handler()
         }
         /* parse command line */
         i = 0;
-        // x = 0;
+        strcpy(command_pipe, command);
         token = strtok(command, " ");
-        // printf("token ->  %s  \n", token);
         while (token != NULL)
         {
+           
             argv1[i] = token;
-            // argvs[x][i] = token;
             token = strtok(NULL, " ");
-            // printf("token ->  %s  \n", token);
             i++;
-            if (token && !strcmp(token, "|")) // "cat colors | cat | cat | cat"
+            if (token && !strcmp(token, "|")) /////* if pips *//////
             {
-               piping = 1;
-            //    pipings = 1;
-            //    x++;
+               dev(buffer, &ind, command_pipe, "|");
+               my_pipe(buffer, ind);
                break;
             }
         }
+        ///////////////////////////////////////////////////////////////
         argv1[i] = NULL;
         argc1 = i;
 
@@ -110,7 +175,7 @@ void handler()
         if (argv1[0] == NULL)
             continue;
         
-        
+        //////*read*/////
         if(!strcmp(argv1[0], "read")){
 
             char *str1 = malloc(strlen(argv1[0]) + 2); // +2 for "$" and null terminator
@@ -131,6 +196,8 @@ void handler()
         {
             exit(0);
         }
+
+        ////////* !! *///////
         else if (!strcmp(argv1[0], "!!"))
         {
             strcpy(command, previous_command);
@@ -150,45 +217,6 @@ void handler()
                 }
             }
         }
-        // else if(argv1[0][0] == "$")
-        // {
-        //     printf("Zubi \n");
-        // }
-
-        // /* Does command contain pipe */
-        // if (piping == 1) {
-        //     i = 0;
-        //     while (token!= NULL)
-        //     {
-        //         token = strtok (NULL, " ");
-        //         // printf("token2 ->  %s  \n", token);
-        //         argv2[i] = token;
-        //         argvs[x][i] = token;
-        //         i++;
-        //         if (token && !strcmp(token, "|"))
-        //         {
-        //             piping = 2;
-        //             argv2[i] = NULL;
-        //             x++;
-        //             break;
-        //         }
-        //     }
-        //     argv2[i] = NULL;
-        // }
-        // if(piping == 2){
-        //     i = 0;
-        //     while (token!= NULL)
-        //     {
-        //         token = strtok (NULL, " ");
-        //         printf("token3 ->  %s  \n", token);
-        //         argv3[i] = token;
-        //         argvs[x][i] = token;
-        //         printf("%s : \n", argv3[i]);
-        //         i++;
-        //     }
-        //     argv3[i] = NULL;
-        // }
-       
 
         /* prompt change */
         if (!strcmp(argv1[0], "prompt"))
@@ -202,13 +230,16 @@ void handler()
             }
             continue;
         }
+
+         ////////* echo *///////
         else if (!strcmp(argv1[0], "echo"))
         {
-
+            /* echo $? */
             if (!strcmp(argv1[1], "$?")){
 
                 printf("%d", status);
-
+            
+            /* echo ?object */
             }else if(argv1[1][0] == '$'){
                 for (int i = 0; i < num_variables; i++)
                 {
@@ -219,6 +250,7 @@ void handler()
                     }
                 }
             }
+            /* Regular echo */
             else{
 
                 for (size_t indx = 1; indx < argc1; ++indx)
@@ -230,6 +262,8 @@ void handler()
             printf("\n");
             continue;
         }
+
+         //////* cd *////////
         else if (!strcmp(argv1[0], "cd"))
         {
 
@@ -253,18 +287,21 @@ void handler()
         /* redirect */
         if (argc1 > 1)
         {
+             //////* > *////////
             if (!strcmp(argv1[argc1 - 2], ">"))
             {
                 redirect = 1;
                 argv1[argc1 - 2] = NULL;
                 outfile = argv1[argc1 - 1];
             }
+             //////* 2> *////////
             else if (!strcmp(argv1[argc1 - 2], "2>"))
             {
                 outerr = 1;
                 argv1[i - 2] = NULL;
                 outfile = argv1[i - 1];
             }
+             //////* >> *////////
             else if (!strcmp(argv1[argc1 - 2], ">>"))
             {
                 argv1[argc1 - 2] = NULL;
@@ -315,104 +352,7 @@ void handler()
                 close(fd);
                 /* stdout is now redirected */
             }
-            // else if (pipings)
-            // {
-            //     printf("Startings pipes! \n");
-                // pipe(fildes);
-                // if (fork() == 0)
-                // {
-                //     /* first component of command line */
-                //     close(STDOUT_FILENO);
-                //     dup(fildes[1]);
-                //     close(fildes[1]);
-                //     close(fildes[0]);
-                //     /* stdout now goes to pipe */
-                //     /* child process does command */
-                //     execvp(argv1[0], argv1);
-                // }
-                // /* 2nd command component of command line */
-                // close(STDIN_FILENO);
-                // dup(fildes[0]);
-                // close(fildes[0]);
-                // close(fildes[1]);
-                // /* standard input now comes from pipe */
-                // execvp(argv2[0], argv2);
-    //                 int num_pipes = 3;
-    // int **pipes = malloc(sizeof(int *) * num_pipes); // array of pipe arrays
-
-    // // Parse arguments and allocate pipes
-    // for (int i = 0; i < num_pipes; i++)
-    // {
-    //     // Allocate pipe
-    //     pipes[i] = malloc(sizeof(int) * 2);
-    //     if (pipe(pipes[i]) == -1)
-    //     {
-    //         perror("pipe");
-    //         exit(EXIT_FAILURE);
-    //     }
-    // }
-
-    // // Fork child processes and connect pipes
-    // int fd_in = STDIN_FILENO;
-    // for (int i = 0; i < num_pipes; i++)
-    // {
-    //     pid_t pid = fork();
-    //     if (pid == -1)
-    //     {
-    //         perror("fork");
-    //         exit(EXIT_FAILURE);
-    //     }
-    //     else if (pid == 0)
-    //     {
-    //         // Child process
-    //         if (fd_in != STDIN_FILENO)
-    //         {
-    //             if (dup2(fd_in, STDIN_FILENO) == -1)
-    //             {
-    //                 perror("dup2");
-    //                 exit(EXIT_FAILURE);
-    //             }
-    //             close(fd_in);
-    //         }
-    //         if (i != num_pipes - 1)
-    //         {
-    //             if (dup2(pipes[i][1], STDOUT_FILENO) == -1)
-    //             {
-    //                 perror("dup2");
-    //                 exit(EXIT_FAILURE);
-    //             }
-    //         }
-    //         for (int j = 0; j < num_pipes; j++)
-    //         {
-    //             close(pipes[j][0]);
-    //             close(pipes[j][1]);
-    //         }
-    //         execvp(argvs[i][0], argvs[i]);
-    //         perror("execvp");
-    //         exit(EXIT_FAILURE);
-    //     }
-    //     else
-    //     {
-    //         // Parent process
-    //         close(pipes[i][1]);
-    //         fd_in = pipes[i][0];
-    //     }
-    // }
-
-    // // Wait for all child processes to finish
-    // for (int i = 0; i < num_pipes; i++)
-    // {
-    //     wait(NULL);
-    // }
-
-    // // Free memory
-    // for (int i = 0; i < num_pipes; i++)
-    // {
-    //     free(pipes[i]);
-    // }
-    // free(pipes);
-
-    //         }
+           
             execvp(argv1[0], argv1);
         }
         /* parent continues over here... */
