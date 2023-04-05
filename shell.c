@@ -24,7 +24,7 @@ int i;
 
 /*flags*/
 int amper, redirect, concat /*open new file*/, outerr /*related to stderr*/;
-int fd, piping, pipings = 0, retid, status, argc1 /*last token indx*/;
+int fd, pipe_flag /*check if pipe is currently in progress*/, retid, status, argc1 /*last token indx*/;
 
 /*pipes*/
 int ind = 0;
@@ -43,6 +43,7 @@ void my_remove(char *conn)
     }
 }
 
+/*splits the command into a separte cells -> | cmd 1 | cmd 2  | cmd 3 | ... | */
 void dev(char **buffer, int *n, char *bf, const char *ch)
 {
     char *tk;
@@ -59,7 +60,8 @@ void dev(char **buffer, int *n, char *bf, const char *ch)
     *n = place;
 }
 
-/*pipe functionality, is working fine for now need to fix */
+/*pipe functionality limits to 50 pipes
+, is working fine for now need to fix */
 void my_pipe(char **buf, int index)
 {
     if (index > 50)
@@ -83,6 +85,7 @@ void my_pipe(char **buf, int index)
                 return;
             }
         }
+        /*child*/
         if (fork() == 0)
         {
             if (i != index - 1)
@@ -99,8 +102,9 @@ void my_pipe(char **buf, int index)
                 close(fd[i - 1][0]);
             }
             execvp(array[0], array);
+            exit(1);
         }
-
+        /*parent*/
         if (i != 0)
         {
             close(fd[i - 1][0]);
@@ -131,7 +135,6 @@ void get_command_from_std()
         commands[num_comm] = strdup(command);
         num_comm++;
     }
-    piping = 0;
 }
 
 /*read function*/
@@ -231,9 +234,10 @@ void prev_command()
         argv[i] = token;
         token = strtok(NULL, " ");
         i++;
-        if (token && !strcmp(token, "|"))
+        if (token && !strcmp(token, "|")) // do the same as we done in pipes//
         {
-            piping = 1;
+            dev(buffer, &ind, command_pipe, "|");
+            my_pipe(buffer, ind);
             break;
         }
     }
@@ -256,30 +260,26 @@ void echo()
     /* echo $? */
     if (!strcmp(argv[1], "$?"))
     {
-
-        printf("%d", status);
-
-        /* echo ?object */
+        printf("%d ", status);
     }
-    else if (argv[1][0] == '$')
+    /* echo ?object */
+    if (argv[1][0] == '$')
     {
-        for (int i = 0; i < num_variables; i++)
+        for (int i = 0; i < num_variables; ++i)
         {
             if (!strcmp(names[i], argv[1]))
             {
                 // Return variable value
-                printf("%s", values[i]);
+                printf("%s ", values[i]);
             }
         }
     }
     /* Regular echo */
-    else
+    if (argv[1][0] != '$' && strcmp(argv[1], "$?"))
     {
-
-        for (size_t indx = 1; indx < argc1; ++indx)
+        for (int i = 1; i < argc1; ++i)
         {
-
-            printf("%s ", argv[indx]);
+            printf("%s ", argv[i]);
         }
     }
     printf("\n");
@@ -365,7 +365,6 @@ void forks()
         close(fd);
         /* stdout is now redirected */
     }
-
     execvp(argv[0], argv);
 }
 
@@ -376,6 +375,7 @@ void shell()
 
     while (1)
     {
+        pipe_flag = 0;
 
         if (argv[0] != NULL)
         {
@@ -412,6 +412,7 @@ void shell()
             i++;
             if (token && !strcmp(token, "|")) /////* if pips *//////
             {
+                pipe_flag = 1; // pipe is in progress//
                 dev(buffer, &ind, command_pipe, "|");
                 my_pipe(buffer, ind);
                 break;
@@ -437,10 +438,28 @@ void shell()
         {
             exit(0);
         }
-        else if (!strcmp(argv[0], "!!"))
+        else if (!strcmp(argv[0], "!!")) // make this an outside method later//
         {
-            prev_command();
-            continue;
+            strcpy(command, previous_command);
+            /* parse command line */
+            i = 0;
+            token = strtok(command, " ");
+            while (token != NULL)
+            {
+                argv[i] = token;
+                token = strtok(NULL, " ");
+                i++;
+                if (token && !strcmp(token, "|"))
+                {
+                    pipe_flag = 1;
+                    dev(buffer, &ind, command_pipe, "|");
+                    my_pipe(buffer, ind);
+                    break;
+                }
+            }
+            argv[i] = NULL;
+            argc1 = i;
+            pipe_flag = 0;
         }
 
         //
@@ -474,10 +493,16 @@ void shell()
         {
             redirects();
         }
-
-        if (fork() == 0)
+        if (pipe_flag == 0)
         {
-            forks();
+            if (fork() == 0)
+            {
+                forks();
+            }
+        }
+        else
+        {
+            pipe_flag = 0;
         }
         /* parent continues over here... */
         /* waits for child to exit if required */
