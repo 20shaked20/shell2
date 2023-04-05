@@ -32,6 +32,17 @@ int fildes[3];
 char *buffer[256] /*pipe buffer*/;
 char command_pipe[1024]; /*pipe command to execute*/
 
+/*if-else-fi*/
+char if_command[1024];
+char then_command[1024];
+char do_command[1024];
+char else_command[1024];
+char else_do_command[1024];
+char fi_command[1024];
+
+int flag_then = 0; // if
+int flag_else = 0; // else
+
 /*remove spaces and '\n'*/
 void my_remove(char *conn)
 {
@@ -119,14 +130,14 @@ void sig_handler()
 {
     signal(SIGINT, sig_handler);
     printf("\n You typed Control-C!\n");
-    printf("%s: ", prompt);
+    printf("%s ", prompt);
     fflush(stdout);
 }
 
 /*this method gets the command entered by the user in the std and it saves it in the list of commands*/
 void get_command_from_std()
 {
-    printf("%s: ", prompt);
+    printf("%s ", prompt);
     fgets(command, 1024, stdin);
     command[strlen(command) - 1] = '\0';
     if (command[0] != '\033')
@@ -387,7 +398,34 @@ void shell()
             }
         }
         /*saving the commnd entered by the user*/
-        get_command_from_std();
+        if (flag_then == 1) // if-then command//
+        {
+            strcpy(command, do_command);
+            command[strlen(command) - 1] = '\0';
+            if (command[0] != '\033')
+            {
+                // dont add and ignore blank commands or arrow ones//
+                commands[num_comm] = strdup(command);
+                num_comm++;
+            }
+            flag_then = 0;
+        }
+        else if (flag_else == 1) // else command//
+        {
+            strcpy(command, else_do_command);
+            command[strlen(command) - 1] = '\0';
+            if (command[0] != '\033')
+            {
+                // dont add and ignore blank commands or arrow ones//
+                commands[num_comm] = strdup(command);
+                num_comm++;
+            }
+            flag_else = 0;
+        }
+        else // std command from normal type.
+        {
+            get_command_from_std();
+        }
         char ch = command[0];
 
         /*if is object save*/
@@ -410,7 +448,7 @@ void shell()
             argv[i] = token;
             token = strtok(NULL, " ");
             i++;
-            if (token && !strcmp(token, "|")) /////* if pips *//////
+            if (token && !strcmp(token, "|") && strcmp(argv[0],"if")/*in case this is happens, we dont want it to do pipes in the first time, because the system will handle it.*/) /////* if pips *//////
             {
                 pipe_flag = 1; // pipe is in progress//
                 dev(buffer, &ind, command_pipe, "|");
@@ -460,6 +498,47 @@ void shell()
             argv[i] = NULL;
             argc1 = i;
             pipe_flag = 0;
+        }
+
+        if (!strcmp(argv[0], "if"))
+        {
+            char *argv_if[10];
+
+            /*extract  data*/
+            char cmd[1024];
+            memset(cmd, 0, sizeof(cmd)); // set all elements to zero
+            //build the command to run in system, and check if its good//
+            for(int i = 1 ; i<argc1; ++i){
+                strcat(cmd, argv[i]);
+                strcat(cmd," ");
+            }
+
+            fgets(then_command, 1024, stdin); // then
+            fgets(do_command, 1024, stdin);
+
+            fgets(else_command, 1024, stdin); // else
+            fgets(else_do_command, 1024, stdin);
+
+            fgets(fi_command, 1024, stdin); // fi
+
+            if (!strcmp(then_command, "then\n") && !strcmp(else_command, "else\n") && !strcmp(fi_command, "fi\n"))
+            {
+                if (!system(cmd))
+                {
+                    // want to execute do command//
+                    flag_then = 1;
+                }
+                else
+                {
+                    // want to execute else_do_command//
+                    flag_else = 1;
+                }
+            }
+            else
+            {
+                printf("Bad syntax in if-then-else-fi, enter again\n");
+            }
+            continue;
         }
 
         //
