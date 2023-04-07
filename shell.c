@@ -8,7 +8,9 @@
 #include <signal.h>
 #include <string.h>
 
-char *prompt = "hello";
+#include "shell.h"
+
+char *prompt = "hello:";
 
 char *names[10], *values[10]; /*those are used in a manner of 'map' in order to save the names in read and $*/
 int num_variables = 0;        /*the amount of saved variables*/
@@ -33,7 +35,6 @@ char *buffer[256] /*pipe buffer*/;
 char command_pipe[1024]; /*pipe command to execute*/
 
 /*if-else-fi*/
-char if_command[1024];
 char then_command[1024];
 char do_command[1024];
 char else_command[1024];
@@ -43,7 +44,6 @@ char fi_command[1024];
 int flag_then = 0; // if
 int flag_else = 0; // else
 
-/*remove spaces and '\n'*/
 void my_remove(char *conn)
 {
     if (conn[strlen(conn) - 1] == ' ' || conn[strlen(conn) - 1] == '\n')
@@ -54,7 +54,6 @@ void my_remove(char *conn)
     }
 }
 
-/*splits the command into a separte cells -> | cmd 1 | cmd 2  | cmd 3 | ... | */
 void dev(char **buffer, int *n, char *bf, const char *ch)
 {
     char *tk;
@@ -71,8 +70,6 @@ void dev(char **buffer, int *n, char *bf, const char *ch)
     *n = place;
 }
 
-/*pipe functionality limits to 50 pipes
-, is working fine for now need to fix */
 void my_pipe(char **buf, int index)
 {
     if (index > 50)
@@ -125,7 +122,6 @@ void my_pipe(char **buf, int index)
     }
 }
 
-/*this function is responsible for CTRL-C catch and handle*/
 void sig_handler()
 {
     signal(SIGINT, sig_handler);
@@ -134,7 +130,6 @@ void sig_handler()
     fflush(stdout);
 }
 
-/*this method gets the command entered by the user in the std and it saves it in the list of commands*/
 void get_command_from_std()
 {
     printf("%s ", prompt);
@@ -148,10 +143,8 @@ void get_command_from_std()
     }
 }
 
-/*read function*/
 void read_variable()
 {
-
     char *str1 = malloc(strlen(argv[0]) + 2); // +2 for "$" and null terminator
     sprintf(str1, "$%s", argv[1]);            // use sprintf to concatenate strings
     names[num_variables] = strdup(str1);
@@ -163,7 +156,6 @@ void read_variable()
     free(str1); // free memory allocated by malloc
 }
 
-/*adds a new variable with the use of $'var' = 'something'*/
 void new_variable()
 {
     i = 0;
@@ -232,29 +224,6 @@ void traverse_commands()
     }
 }
 
-/*executes the last command that was made by the user*/
-void prev_command()
-{
-    strcpy(command, previous_command);
-
-    /* parse command line */
-    i = 0;
-    token = strtok(command, " ");
-    while (token != NULL)
-    {
-        argv[i] = token;
-        token = strtok(NULL, " ");
-        i++;
-        if (token && !strcmp(token, "|")) // do the same as we done in pipes//
-        {
-            dev(buffer, &ind, command_pipe, "|");
-            my_pipe(buffer, ind);
-            break;
-        }
-    }
-}
-
-/*changes the prompt of the user*/
 void prompt_change()
 {
     if (!strcmp(argv[1], "="))
@@ -265,7 +234,6 @@ void prompt_change()
     }
 }
 
-/*the echo function in c*/
 void echo()
 {
     /* echo $? */
@@ -296,7 +264,6 @@ void echo()
     printf("\n");
 }
 
-/*changes the directory of the user*/
 void change_dir()
 {
 
@@ -307,7 +274,6 @@ void change_dir()
     }
 }
 
-/*handles the redirects*/
 void redirects()
 {
     //////* > *////////
@@ -346,7 +312,71 @@ void redirects()
     }
 }
 
-/* for commands not part of the shell command language */
+void repeat_last_command()
+{
+    strcpy(command, previous_command);
+    /* parse command line */
+    i = 0;
+    token = strtok(command, " ");
+    while (token != NULL)
+    {
+        argv[i] = token;
+        token = strtok(NULL, " ");
+        i++;
+        if (token && !strcmp(token, "|"))
+        {
+            pipe_flag = 1;
+            dev(buffer, &ind, command_pipe, "|");
+            my_pipe(buffer, ind);
+            break;
+        }
+    }
+    argv[i] = NULL;
+    argc1 = i;
+    pipe_flag = 0;
+}
+
+void if_then_else_fi()
+{
+    char *argv_if[10];
+
+    /*extract  data*/
+    char cmd[1024];
+    memset(cmd, 0, sizeof(cmd)); // set all elements to zero
+    // build the command to run in system, and check if its good//
+    for (int i = 1; i < argc1; ++i)
+    {
+        strcat(cmd, argv[i]);
+        strcat(cmd, " ");
+    }
+
+    fgets(then_command, 1024, stdin); // then
+    fgets(do_command, 1024, stdin);
+
+    fgets(else_command, 1024, stdin); // else
+    fgets(else_do_command, 1024, stdin);
+
+    fgets(fi_command, 1024, stdin); // fi
+
+    if (!strcmp(then_command, "then\n") && !strcmp(else_command, "else\n") && !strcmp(fi_command, "fi\n"))
+    {
+        if (!system(cmd))
+        {
+            // want to execute do command//
+            flag_then = 1;
+        }
+        else
+        {
+            // want to execute else_do_command//
+            flag_else = 1;
+        }
+    }
+    else
+    {
+        printf("Bad syntax in if-then-else-fi, enter again\n");
+    }
+}
+
 void forks()
 {
     /* redirection of IO ? */
@@ -448,7 +478,7 @@ void shell()
             argv[i] = token;
             token = strtok(NULL, " ");
             i++;
-            if (token && !strcmp(token, "|") && strcmp(argv[0],"if")/*in case this is happens, we dont want it to do pipes in the first time, because the system will handle it.*/) /////* if pips *//////
+            if (token && !strcmp(token, "|") && strcmp(argv[0], "if") /*in case this is happens, we dont want it to do pipes in the first time, because the system will handle it.*/) /////* if pips *//////
             {
                 pipe_flag = 1; // pipe is in progress//
                 dev(buffer, &ind, command_pipe, "|");
@@ -478,66 +508,12 @@ void shell()
         }
         else if (!strcmp(argv[0], "!!")) // make this an outside method later//
         {
-            strcpy(command, previous_command);
-            /* parse command line */
-            i = 0;
-            token = strtok(command, " ");
-            while (token != NULL)
-            {
-                argv[i] = token;
-                token = strtok(NULL, " ");
-                i++;
-                if (token && !strcmp(token, "|"))
-                {
-                    pipe_flag = 1;
-                    dev(buffer, &ind, command_pipe, "|");
-                    my_pipe(buffer, ind);
-                    break;
-                }
-            }
-            argv[i] = NULL;
-            argc1 = i;
-            pipe_flag = 0;
+            repeat_last_command();
         }
 
         if (!strcmp(argv[0], "if"))
         {
-            char *argv_if[10];
-
-            /*extract  data*/
-            char cmd[1024];
-            memset(cmd, 0, sizeof(cmd)); // set all elements to zero
-            //build the command to run in system, and check if its good//
-            for(int i = 1 ; i<argc1; ++i){
-                strcat(cmd, argv[i]);
-                strcat(cmd," ");
-            }
-
-            fgets(then_command, 1024, stdin); // then
-            fgets(do_command, 1024, stdin);
-
-            fgets(else_command, 1024, stdin); // else
-            fgets(else_do_command, 1024, stdin);
-
-            fgets(fi_command, 1024, stdin); // fi
-
-            if (!strcmp(then_command, "then\n") && !strcmp(else_command, "else\n") && !strcmp(fi_command, "fi\n"))
-            {
-                if (!system(cmd))
-                {
-                    // want to execute do command//
-                    flag_then = 1;
-                }
-                else
-                {
-                    // want to execute else_do_command//
-                    flag_else = 1;
-                }
-            }
-            else
-            {
-                printf("Bad syntax in if-then-else-fi, enter again\n");
-            }
+            if_then_else_fi();
             continue;
         }
 
