@@ -6,9 +6,9 @@ The program executes commands:
 1. **ls -l**
 2. **ls –l &**
 3.  **redirects:** 
-**ls –l > file** Routes output to a file >
-**ls –l nofile 2> mylo**g write routing to stderr 2>
-**ls -l >> mylog** Adding to an existing file by >> 
+* **ls –l > file** Routes output to a file >
+* **ls –l nofile 2> mylo**g write routing to stderr 2>
+* **ls -l >> mylog** Adding to an existing file by >> 
 4. **prompt_change** prompt = myprompt Command to change the cursor
 5. **echo** command that prints the arguments
 6. **echo $?** command Print the status of the last command executed.
