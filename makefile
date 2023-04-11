@@ -8,7 +8,7 @@ SOURCES = shell.c
 all: myshell
 
 myshell: $(OBJECTS_Shell) lib_shell.a
-	$(CC) $(FLAGS) -o shell $(OBJECTS_Shell) lib_shell.a 
+	$(CC) $(FLAGS) -o myshell $(OBJECTS_Shell) lib_shell.a 
 
 #Make commands as singles:
 
@@ -22,5 +22,5 @@ myshell.o: shell.c shell.h
 .PHONY: clean all
 
 clean:
-	rm -f *.o *.so *.txt shell lib_shell.a
+	rm -f *.o *.so *.txt myshell lib_shell.a
 
