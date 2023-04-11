@@ -1,8 +1,24 @@
-# shell2
-An extended version of the shell program we made last year
 
-**SHALL.C**
-The program executes commands:
+# Shell
+This is an extended version of the shell program we made last year. </br>
+
+This is a sample of how a shell is operating under the linux os. </br>
+We recreated some of the methods that shell supports in our own way. </br>
+In this shell we also allowed pipe supporting and if-then-else-fi support. </br>
+
+
+## How To Use
+
+* clone to folder into the relevant workspace in linux </br>
+* make sure you're in the right directory </br> 
+* run the command "make/ make all" in terminal which will create the program to run. </br>
+* inside the terminal where you created the outfile named "myshell" execute - "./myshell" </br>
+* Welcome to the shell program, start testing it! </br>
+
+## Command Support
+Our shell program supports multiple commands, including piping. </br>
+Listed below are some of the methods we were requsted to rewrite and you can execute to test them : </br>
+</br>
 1. **ls -l**
 2. **ls –l &**
 3.  **redirects:** 
